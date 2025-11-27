@@ -1,45 +1,82 @@
 import pytest
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-
-
-def pytest_addoption(parser):
-    """
-    Добавляем опцию командной строки --language
-    По умолчанию используется английский язык (en)
-    """
-    parser.addoption(
-        '--language',
-        action='store',
-        default='en',
-        help='Specify language for browser: ru, en, es, fr, etc.'
-    )
+import time
 
 
 @pytest.fixture(scope="function")
-def browser(request):
+def browser():
     """
-    Фикстура для создания браузера с указанным языком
+    Фикстура для инициализации и закрытия браузера
+    scope="function" означает, что браузер создается для каждого теста
     """
-    # Получаем значение параметра language из командной строки
-    user_language = request.config.getoption("language")
-    
-    print(f"\n🌐 Запуск браузера с языком: {user_language}")
-    
-    # Настройка опций Chrome
+
+    print("\n✅ Starting browser...")
+
+    # Опции для Chrome
     options = Options()
-    options.add_experimental_option(
-        'prefs', 
-        {'intl.accept_languages': user_language}
-    )
-    
-    # Создание экземпляра браузера
-    browser = webdriver.Chrome(options=options)
-    browser.implicitly_wait(10)
-    browser.maximize_window()
-    
-    yield browser
-    
-    # Закрытие браузера после теста
-    print(f"\n🛑 Закрытие браузера")
-    browser.quit()
+
+    # Опция 1: Раскомментируйте для headless режима (без окна браузера)
+    # options.add_argument("--headless")
+
+    # Опция 2: Отключаем sandbox (для Linux серверов)
+    options.add_argument("--no-sandbox")
+
+    # Опция 3: Отключаем использование dev shm (для Linux серверов)
+    options.add_argument("--disable-dev-shm-usage")
+
+    # Опция 4: Отключаем сигнал автоматизации
+    options.add_argument("--disable-blink-features=AutomationControlled")
+
+    # Опция 5: Устанавливаем размер окна
+    options.add_argument("--start-maximized")
+
+    # Инициализация Chrome WebDriver
+    driver = webdriver.Chrome(options=options)
+
+    # Неявное ожидание (для поиска элементов)
+    driver.implicitly_wait(10)
+
+    # Явное ожидание (timeout для явного ожидания)
+    driver.set_page_load_timeout(30)
+
+    # Возвращаем браузер в тест
+    yield driver
+
+    # Закрытие браузера после теста (выполняется всегда)
+    print("\n✅ Closing browser...")
+    driver.quit()
+
+
+@pytest.fixture(scope="session")
+def browser_session():
+    """
+    Альтернативная фикстура для браузера с scope="session"
+    Один браузер на все тесты (быстрее, но может быть нестабильнее)
+    Используйте, если тесты независимы
+    """
+    print("\n✅ Starting session browser...")
+    options = Options()
+    driver = webdriver.Chrome(options=options)
+    driver.implicitly_wait(10)
+
+    yield driver
+
+    print("\n✅ Closing session browser...")
+    driver.quit()
+
+
+# Хук для вывода информации перед каждым тестом
+def pytest_runtest_setup(item):
+    """Выполняется перед каждым тестом"""
+    print(f"\n{'=' * 60}")
+    print(f"📋 Running test: {item.name}")
+    print(f"{'=' * 60}")
+
+
+# Хук для вывода информации после каждого теста
+def pytest_runtest_teardown(item, nextitem):
+    """Выполняется после каждого теста"""
+    print(f"\n{'=' * 60}")
+    print(f"✅ Test completed: {item.name}")
+    print(f"{'=' * 60}\n")
